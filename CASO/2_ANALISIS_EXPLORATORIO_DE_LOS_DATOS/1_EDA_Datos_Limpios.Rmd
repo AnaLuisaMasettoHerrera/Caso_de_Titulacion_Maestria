@@ -1,0 +1,622 @@
+---
+title: "Analisis_Exploratorio_Datos_Limpios"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+#Análisis Exploratorio de los Datos
+
+En la sección anterior de este documento, todos los archivos proporcionados por la compañÍa de telecomunicaciones $ABCD$ fueron sometidos a una limpieza de datos con el fin de estructurarlos de tal manera que su manipulación se pueda ejecutar de forma más sencilla. 
+
+Una vez que ya se tienen los datos en un formato homogeneizado se procede a hacer un Análisis Exploratorio de los Datos, análisis que consiste en examinar los datos previamente a la aplicación de cualquier modelo que proporcione una solución a la problemática de la empresa.  La  finalidad  de dicho análisis es extraer información relevante de los datos en crudo que permita adquirir un entendimiento general de estos e indagar en el comportamiento de las variables en cuestión y su relación en conjunto. 
+
+A continuación se presenta el Análisis Exploratorio de los Datos de Venta de la compañía $ABCD$. 
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#Cargar librerías
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(naniar) #plot de valores faltantes
+library(rworldmap) #getmap primer mapa con puntos - podemos quitar mapa y esta librería
+library(devtools) #necesaria para usar la ibreria de mxmaps
+library(mxmaps) #mapas de mexico con división por estado 
+library(fmsb) #telaraña
+library(lubridate) #floor month
+library(ggpubr) #juntar varias gráficas 
+library(maps) #mapa que susituye el de rworldmap 
+```
+
+## Los Datos 
+
+La compañía de telecommunicaciones $ABCD$ posee un registro de sus ventas que se ve de la siguiente manera: 
+
+```{r, message=FALSE, warning=FALSE}
+#Lectura de datos de la tabla con variables relacionadas con el nivel socioeconomico por estado 
+tabla_final_2 <- read_csv("DATOS_LIMPIOS_PARA_EDA.csv")
+```
+
+```{r}
+#head(tabla_final_2)
+```
+
+El registro consta de 932,963 observaciones y 13 variables. 
+
+```{r}
+dim(tabla_final_2)
+```
+
+
+```{r}
+names(tabla_final_2)
+```
+
+
+Con esta visualización general de los datos se pueden estructurar preguntas que permitan entender mejor el contenido dentro de este documento. A continuación se enlistan las preguntas base para comenzar con la comprensión de los datos. 
+
+
+## Preguntas Base
+
+__*1. ¿Hay campos vacíos?*__
+
+Tras la limpieza de datos, a estas alturas los registros __no__ contienen campos vacíos en ninguna variable. 
+
+```{r, include=FALSE}
+p1<- gg_miss_var(tabla_final_2) + labs(y = "Valores faltantes por variable.")
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width=15, fig.height=6}
+p1
+```
+
+__*2. ¿Cuántos puntos de venta distintos hay?*__ 
+
+Hay __1,909__ puntos de venta distintos. 
+
+```{r, include=FALSE}
+p2 <- tabla_final_2 %>% select(punto_de_venta)%>%group_by(punto_de_venta)%>%unique()
+```
+
+```{r}
+nrow(p2)
+```
+
+__*3. ¿Rango de fechas de los datos?*__
+
+El conjunto de observaciones abarcan 10 meses en total, del primero de junio del 2018 al 31 de marzo del 2019. 
+
+```{r, include=FALSE}
+p3 <- tabla_final_2%>%select(fecha)%>%arrange(fecha)%>%unique()
+```
+
+```{r}
+p3[c(1,301),] 
+```
+
+
+__*4. ¿Cuántos productos distintos hay?*__
+
+Hay __455__ productos distintos, cada uno identificado por un SKU único, que la compañía vende.
+
+```{r}
+p4 <- tabla_final_2%>%select(sku)%>%group_by(sku)%>%unique()
+nrow(p4)
+
+```
+
+
+__*5. ¿Cuántas marcas vende la compañía y cuáles son?*__ 
+
+La compañia $ABCD$ cuenta con productos de __12__ marcas distintas. 
+
+```{r, include=FALSE}
+p5 <- tabla_final_2%>%select(marca)%>%group_by(marca)%>%unique()
+```
+
+```{r}
+nrow(p5)
+```
+
+```{r}
+p5%>%arrange(marca)
+```
+
+__*6. ¿Cuántas gammas consideran los datos?*__
+
+Son __4__ las gammas en las que se agrupan los productos. 
+
+```{r, include=FALSE}
+p6 <- tabla_final_2%>%select(gamma)%>%group_by(gamma)%>%unique()
+```
+
+```{r}
+p6
+```
+
+
+__*8. ¿En cuántas zonas esta dividido el territorio?*__
+
+Son __8__ las zonas en las que esta dividido el territorio. 
+
+```{r, include=FALSE}
+p8 <- tabla_final_2%>%select(zona)%>%group_by(zona)%>%unique()
+```
+
+```{r}
+p8
+```
+
+A continuación se presenta la división territorial de la República Mexicana en las 8 zonas delimidas por la *Comisión Nacional para el Conocimiento y Uso de la Biodiversidad*. 
+
+```{r, fig.height=5, fig.width=2.5}
+knitr::include_graphics("mapa_nuevo.png")
+```
+
+__*9. ¿En cuántos estados tiene presencia la compañía?*__
+
+La compañía tiene presencia en los __32__ estados de la república. 
+
+```{r, include=FALSE}
+p9 <- tabla_final_2%>%select(estado)%>%group_by(estado)%>%unique()
+```
+
+```{r}
+nrow(p9)
+```
+
+__*10. ¿En cuántas ciudades tiene presencia la compañía?*__
+
+son __228__ las ciudades en las que la compañía tiene presencia. 
+
+```{r, include=FALSE}
+p10 <- tabla_final_2%>%select(ciudad)%>%group_by(ciudad)%>%unique()
+```
+
+```{r}
+nrow(p10)
+```
+
+
+```{r, include=FALSE}
+#__*11. ¿Cómo esta la situación relacionada a la distribución socioeconómica por estado?*__
+#p11 <- tabla_final_2%>%select(estado, hogares_ab, hogares_c_mas, hogares_c, hogares_c_menos, hogares_d_mas, hogares_d, hogares_e)
+#p11%>%group_by(estado)%>%unique()
+#####visualizacion cool con cognos ibm 
+
+```
+
+
+
+
+```{r, include=FALSE}
+#__*12. ¿Cómo esta la situación relacionada con la población por estado (estimaciones)?*__
+#PORQUÈ ES RELEVANTE
+#p12 <- tabla_final_2 %>% select(estado, poblacion)
+#p12<-p12%>%group_by(estado)%>%unique()
+```
+
+
+## Información más detallada 
+
+```{r}
+tabla_final_2
+```
+
+__*13. ¿Cómo se comportan las ventas totales de la compañía por mes? *__
+
+Con relación a las ventas totales de la compañía $ABCD$ en los 10 meses de registro, se puede observar un incremento de ventas en los meses de noviembre y diciembre, seguido por una caida drástica en los 3 meses siguientes. 
+
+```{r, include=FALSE}
+p13 <- tabla_final_2 %>% 
+  group_by(month=floor_date(fecha, "month")) %>%
+  summarize(amount=sum(ventas_diarias))
+```
+
+```{r, fig.width=20, fig.height=5}
+ggplot(p13, aes(x=month, y = amount))+geom_line(color='dodgerblue4', size=3)+theme_classic() + geom_smooth(method="lm") + xlab("Mes") + ylab("Ventas")
+```
+
+__*14. ¿Cuál es la región con mayor número de ventas en los meses de registro? *__
+
+La región con mayor número de ventas es la zona __centro sur__ con un total de __512,223__ ventas en los 10 meses de registro, equivalente al __48.85%__ de las ventas registradas. Seguido se encuentra la zona __Centro occidente__ con __167,461__ ventas, equivalente al __15.97%__ de las ventas registradas. 
+
+```{r, include=FALSE}
+p14 <- tabla_final_2 %>% 
+  select(zona, ventas_diarias) %>% 
+  group_by(zona) %>% 
+  summarise(ventas_totales_zona = sum(ventas_diarias)) %>% 
+  arrange(desc(ventas_totales_zona))
+```
+
+```{r}
+p14 <- p14 %>% mutate(porcentaje = ventas_totales_zona*100/1048575)
+p14
+```
+```{r}
+q <- ggplot(data=p14, aes(x=reorder(zona,-ventas_totales_zona), y=ventas_totales_zona, fill=zona)) +
+    geom_bar(colour="black", stat="identity") +
+    guides(fill=FALSE)+
+    scale_fill_manual(values=c("steelblue", "midnightblue","powderblue","steelblue3","skyblue","skyblue1","white","honeydew"))
+q+labs(x="zona", y="ventas",title="Ventas por Zona")+theme_classic()+theme(axis.text.x = element_text(angle = 90,size = 10))
+```
+
+
+```{r, include=FALSE}
+#extraer codigo ed inegi por estado y nombre del estado
+filtrar <- df_mxstate %>%select(region, state_name)
+filtrar$state_name <- tolower(filtrar$state_name)
+filtrar$state_name <- str_replace(filtrar$state_name, "ciudad de méxico", "cdmx")%>%
+  str_replace("méxico", "estado de mexico")%>%
+  str_replace("ó", "o")%>%
+  str_replace("á","a")%>%
+  str_replace("é","e")%>%
+  str_replace("í", "i")
+
+names(filtrar)[2]<-"estado"
+```
+
+```{r, include=FALSE}
+mapa1 <- tabla_final_2%>%select(estado, zona)%>%group_by(estado)%>%unique()
+mapa1 <- left_join(mapa1, p14, by="zona")
+mapa1 <- left_join(mapa1, filtrar, by="estado")
+mapa1 <- mapa1 %>% select(porcentaje, region, estado)
+names(mapa1)[1]<-"value"
+```
+
+```{r, fig.height=15, fig.width=30, message=FALSE, warning=FALSE}
+mxstate_choropleth(mapa1, num_colors = 8, legend="porcentaje de ventas totales por zona", title="Porcentaje de Ventas (junio 2018 - marzo 2019) por zona") 
+```
+
+__*15. ¿Cuáles son los estados con mayor número de ventas en los 10 meses de registro? *__
+
+Los tres estados que registraron mayor número de ventas en los 10 meses de registro con: Cdmx, estado de mexico y jalisco; y los estados que registraron menor nùmero de ventas en los ùltimos 10 meses son: durango, baja california sur y zacatecas
+
+```{r, include=FALSE}
+p15 <- tabla_final_2%>%select(estado, ventas_diarias)%>%group_by(estado)%>%summarise(value = sum(ventas_diarias))
+mapa2 <- left_join(filtrar, p15, by="estado")
+p15 <- mapa2%>%arrange(desc(value))
+```
+
+```{r}
+p15%>%arrange(estado)
+```
+
+
+```{r}
+head(p15[,2:3],3)
+```
+
+```{r}
+tail(p15[,2:3],3)
+```
+
+```{r}
+a <- ggplot(data=p15, aes(x=reorder(estado,-value), y=value, fill=estado)) +
+    geom_bar(colour="black", stat="identity") +
+    guides(fill=FALSE)+
+    scale_fill_manual(values=c("grey", "grey","white","grey","midnightblue","grey","grey","grey","grey", "white","midnightblue","grey","grey","grey","midnightblue","grey","grey", "grey","grey","grey","grey","grey","grey","grey","grey", "grey","grey","grey","grey","grey","grey","white"))
+a+labs(x="estado", y="ventas",title="Ventas por Estado")+theme_classic()+theme(axis.text.x = element_text(angle = 90,size = 10))
+```
+
+
+```{r, fig.height=15, fig.width=30}
+mxstate_choropleth(mapa2, num_colors = 9, legend="ventas", title="Ventas totales (junio 2018 - marzo 2019) por estado") 
+```
+
+__*16. Identificar puntos de venta-*__
+
+Son __1,909__ puntos de venta en toda la República Mexicana. 
+
+```{r, include=FALSE}
+p16 <- tabla_final_2 %>% group_by(punto_de_venta, longitud, latitud) %>% summarise(ventas = sum(ventas_diarias)) %>% arrange(desc(ventas))
+```
+
+```{r}
+nrow(p16)
+```
+
+```{r, include=FALSE}
+#Con la librería maps, extraer el mapa mundial y luego extraer unicámente la información de México
+mapa_mundial <- map_data("world")
+mexico <- subset(mapa_mundial, mapa_mundial$region=="Mexico")
+```
+
+```{r, include=FALSE}
+#Base para hacer gráfica
+p <- ggplot() + coord_fixed() +xlab("") + ylab("")
+
+#Construir mapa
+mapa3_pdv <- p + 
+  geom_polygon(data=mexico, aes(x=long, y=lat, group=group), colour="gray90", fill="gray90")+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_rect(fill = 'white', colour = 'white'), 
+        axis.line = element_line(colour = "white"),
+        axis.ticks=element_blank(), axis.text.x=element_blank(),
+        axis.text.y=element_blank()
+        )
+```
+
+```{r, fig.height=15, fig.width=30}
+mapa3<- mapa3_pdv +
+  geom_point(data=p16, 
+             aes(x=longitud, y=latitud),colour="blue", 
+             fill="blue",
+             size=2,pch=17, alpha=I(0.7))+ggtitle("Localización de puntos de vent")
+```
+
+```{r, fig.height=15, fig.width=30}
+mapa3
+```
+
+__*17. Identificar puntos de venta con mayor unidades vendidas en los 10 meses de registro.*__
+
+```{r, include=FALSE}
+p17 <- tabla_final_2 %>% group_by(punto_de_venta, estado, zona, longitud, latitud) %>% summarise(ventas = sum(ventas_diarias)) %>% arrange(desc(ventas))
+```
+
+```{r, include=FALSE}
+p17 <- p17 %>% mutate(escala = 0)
+
+p17$escala[which(p17$ventas< 50)]<-"ventas < 50"
+p17$escala[which(p17$ventas>=50 & p17$ventas<100)]<-"50 <= ventas < 100"
+p17$escala[which(p17$ventas>=100 & p17$ventas<500)]<-"100 <= ventas < 500"
+p17$escala[which(p17$ventas>=500 & p17$ventas<1000)]<-"500 <= ventas < 1000"
+p17$escala[which(p17$ventas>=1000 & p17$ventas<2000)]<-"1000 <= ventas < 2000"
+p17$escala[which(p17$ventas>=2000 & p17$ventas<3000)]<-"2000 <= ventas < 3000"
+p17$escala[which(p17$ventas>=3000 & p17$ventas<4000)]<-"3000 <= ventas < 4000"
+p17$escala[which(p17$ventas>=4000 & p17$ventas<5000)]<-"4000 <= ventas < 5000"
+p17$escala[which(p17$ventas>=5000)]<-"5000 <= ventas"
+
+p17_1 <- p17%>%filter(escala=="ventas < 50")
+p17_2 <- p17%>%filter(escala=="50 <= ventas < 100")
+p17_3 <- p17%>%filter(escala=="100 <= ventas < 500")
+p17_4 <- p17%>%filter(escala=="500 <= ventas < 1000")
+p17_5 <- p17%>%filter(escala=="1000 <= ventas < 2000")
+p17_6 <- p17%>%filter(escala=="2000 <= ventas < 3000")
+p17_7 <- p17%>%filter(escala=="3000 <= ventas < 4000")
+p17_8 <- p17%>%filter(escala=="4000 <= ventas < 5000")
+p17_9 <- p17%>%filter(escala=="5000 <= ventas")
+```
+
+```{r, include=FALSE}
+mapa4<- 
+  mapa3_pdv +
+  geom_point(data=p17_1, 
+             aes(x=longitud, y=latitud), colour="black", 
+             fill="black",
+             size=5,pch=17, alpha=I(0.1))+
+  xlab("Son 256 puntos de venta que registraron menos de 50 ventas en 10 meses")
+
+mapa5<- 
+  mapa3_pdv +
+  geom_point(data=p17_2, 
+             aes(x=longitud, y=latitud), colour="black", 
+             fill="black",
+             size=5,pch=17, alpha=I(0.1))+
+  xlab("Son 163 puntos de venta que registraron más de 50 ventas pero menos de 100 en 10 meses")
+
+mapa6<- 
+  mapa3_pdv +
+  geom_point(data=p17_3, 
+             aes(x=longitud, y=latitud), colour="Red", 
+             fill="Red",
+             size=5,pch=17, alpha=I(0.1))+
+  xlab("Son 856 puntos de venta que registraron más de 100 ventas pero menos de 500 en 10 meses")
+
+mapa7<- 
+  mapa3_pdv +
+  geom_point(data=p17_4, 
+             aes(x=longitud, y=latitud), colour="Red", 
+             fill="Red",
+             size=5,pch=17, alpha=I(0.1))+
+  xlab("Son 309 puntos de venta que registraron más de 500 ventas pero menos de 1000 en 10 meses")
+
+mapa8<- 
+  mapa3_pdv +
+  geom_point(data=p17_5, 
+             aes(x=longitud, y=latitud), colour="orange", 
+             fill="orange",
+             size=5,pch=17, alpha=I(0.8))+
+  xlab("Son 232 puntos de venta que registraron más de 1000 ventas pero menos de 2000 en 10 meses")
+
+mapa9<- 
+  mapa3_pdv +
+  geom_point(data=p17_6, 
+             aes(x=longitud, y=latitud), colour="orange", 
+             fill="orange",
+             size=5,pch=17, alpha=I(0.8))+
+  xlab("Son 64 puntos de venta que registraron más de 2000 ventas pero menos de 3000 en 10 meses")
+
+mapa10<- 
+  mapa3_pdv +
+  geom_point(data=p17_7, 
+             aes(x=longitud, y=latitud), colour="green", 
+             fill="green",
+             size=5,pch=17)+
+  xlab("Son 20 puntos de venta que registraron más de 3000 ventas pero menos de 4000 ventas en 10 meses")
+
+mapa11<- 
+  mapa3_pdv +
+  geom_point(data=p17_8, 
+             aes(x=longitud, y=latitud), colour="green", 
+             fill="green",
+             size=5,pch=17)+
+  xlab("Son 7 puntos de venta que registraron más de 4000 ventas pero menos de 5000 en 10 meses")
+
+mapa12<- 
+  mapa3_pdv +
+  geom_point(data=p17_9, 
+             aes(x=longitud, y=latitud), colour="blue", 
+             fill="blue",
+             size=5,pch=17)+
+  xlab("Son 2 puntos de venta que registraron más de 5000 ventas en 10 meses")
+```
+
+```{r, fig.height=20, fig.width=30}
+mapa4 <- ggarrange(mapa12, mapa11, mapa10, mapa9, mapa8, mapa7, mapa6, mapa5, mapa4, ncol=3, nrow=3)
+annotate_figure(mapa4, bottom = text_grob("Puntos de venta de la compañía de telecomunicaciones ABCD dependiendo del número de unidades vendidas", color = "black", face = "bold", size = 30),left = text_grob("   Puntos de ventas con menos de 500 unidades vendidas                           Puntos de ventas con menos de 3000 unidades vendidas                    Puntos de ventas con más de 4000 unidades vendidas", color = "black", rot = 90, size = 15))
+```
+
+
+__*19. Ventas por marca durante 10 meses*__
+
+Los registros indican que en los últimos 10 meses la marca cuyas ventas son las mayores es Huawei, seguidas por Motorola y Samsung. De la misma manera se pude observar que hay 9 registros que poseen NA en el campo de Marca y que Lenovo y Affixx son las marcas con menos ventas. 
+
+```{r}
+p19 <- tabla_final_2 %>% group_by(marca) %>% summarise(ventas_totales = sum(ventas_diarias)) %>% arrange(ventas_totales) %>% mutate(marca=factor(marca, levels=marca))
+```
+
+```{r, fig.width=20, fig.height=7}
+p19 %>% ggplot( aes(x=marca, y=ventas_totales, label=round(ventas_totales,1))) +
+  geom_segment( aes(xend=marca, yend=3)) +
+  geom_point( size=3, color="dodgerblue4") +
+  coord_flip() +
+  theme_classic() +
+  xlab("Marcas")+
+  ylab("Ventas")+
+  geom_text(nudge_x = .28)
+```
+
+__*20. $Ventas por marca por día$*__
+
+```{r, fig.width=30, fig.height=10}
+por_marca_por_dia<- tabla_final_2 %>% 
+  group_by(marca, fecha) %>% 
+  summarise(ventas_diarias = sum(ventas_diarias))
+
+ggplot(por_marca_por_dia, aes(x=fecha, y = ventas_diarias, color=marca))+
+  geom_line(size=2) + 
+  theme_classic()
+```
+
+Lo que se pude observar en esta gráfica es que, sin importar la marca, hay periodos en los que las ventas se disparan, por ejemplo: Diciembre. 
+
+Sin embargo, para tener una visión más clara de lo que pasa en cada escenario de cada marca, se hace la siguiente gráfica: 
+
+```{r, fig.width=30, fig.height=15}
+ggplot(por_marca_por_dia, aes(x=fecha, y = ventas_diarias, color=marca))+
+  geom_line(size=2) + 
+  facet_wrap(~marca, scales = "free") + 
+  geom_smooth(method='lm')+
+  theme_classic()
+```
+
+__*20_B. $Ventas totales por marca por mes $*__
+
+```{r, fig.width=30, fig.height=10}
+ventas_marca_mes <- tabla_final_2 %>% group_by(marca, mes=floor_date(fecha, "month")) %>%
+   summarize(ventas=sum(ventas_diarias))
+
+ggplot(ventas_marca_mes, aes(x=mes, y = ventas, color=marca))+
+  geom_line(size=2) +
+  theme_classic()
+```
+
+
+```{r, fig.width=30, fig.height=15}
+ggplot(ventas_marca_mes, aes(x=mes, y = ventas, color=marca))+
+  geom_line(size=2) + 
+  facet_wrap(~marca, scales = "free") + 
+  geom_smooth(method='lm')+
+  theme_classic()
+```
+
+__*21. $Ventas por SKUs por marca$*__
+Comportamiento de productos por marca en los últimos 10 meses 
+```{r}
+sku_marca <- tabla_final_2 %>% group_by(marca, sku, mes=floor_date(fecha, "month")) %>%
+   summarise(ventas=sum(ventas_diarias))
+#cuantos sku por marca hay 
+sku_marca%>%select(marca,sku)%>%unique()%>%mutate(tol=1)%>%group_by(marca)%>%summarise(n=sum(tol))%>%arrange(desc(n))
+
+```
+
+```{r}
+affix <- sku_marca%>%filter(marca=="affix")
+alcatel <- sku_marca%>%filter(marca=="alcatel")
+apple <- sku_marca%>%filter(marca=="apple")
+Hisense <- sku_marca%>%filter(marca=="hisense")
+Huawei <- sku_marca%>%filter(marca=="huawei")
+Lanix <- sku_marca%>%filter(marca=="lanix")
+Lenovo <- sku_marca%>%filter(marca=="lenovo")
+LG <- sku_marca%>%filter(marca=="lg")
+Motorola <- sku_marca%>%filter(marca=="motorola")
+Samsung <- sku_marca%>%filter(marca=="samsung")
+Sony <- sku_marca%>%filter(marca=="sony")
+ZTE <- sku_marca%>%filter(marca=="zte")
+m1<-ggplot(affix, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m2<-ggplot(alcatel, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m3<-ggplot(apple, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m4 <- ggplot(Hisense, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m5 <- ggplot(Huawei, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m6 <- ggplot(Lanix, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m7 <- ggplot(Lenovo, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m8 <- ggplot(LG, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m9 <- ggplot(Motorola, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m10 <- ggplot(Samsung, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m11 <- ggplot(Sony, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+m12 <- ggplot(ZTE, aes(x=mes, y=ventas, color=sku))+geom_line(size=1)
+```
+
+```{r, fig.width=30, fig.height=10}
+ggarrange(m1, m2, m3, 
+          labels = c("AFFIX", "ALCATEL", "APPLE"),
+          ncol = 1, nrow = 3)
+```
+
+```{r, fig.width=30, fig.height=10}
+ggarrange(m4, m5, m6, 
+          labels = c("HISENSE", "HUAWEI", "LANIX"),
+          ncol = 1, nrow = 3)
+```
+
+```{r, fig.width=30, fig.height=10}
+ggarrange(m7, m8, m9, 
+          labels = c("LENOVO", "LG", "MOTOROLA"),
+          ncol = 1, nrow = 3)
+```
+
+```{r, fig.width=30, fig.height=10}
+ggarrange(m10, m11, m12, 
+          labels = c("SAMSUNG", "SONY", "ZTE"),
+          ncol = 1, nrow = 3)
+```
+
+__*22. $Ventas por marca y estado$*__
+
+```{r}
+marca_estado<- tabla_final_2 %>% group_by(estado, marca) %>%
+   summarise(ventas=sum(ventas_diarias))
+
+```
+
+```{r}
+library(RColorBrewer)
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+x <- ggplot(marca_estado, aes(x = reorder(estado, -ventas), y = ventas, fill = marca)) + 
+  geom_bar(stat = "identity")+ 
+  scale_fill_brewer(palette = "Paired")+theme_classic()
+x+labs(x="estado", y="ventas",title="Ventas por Estado por Marca")+theme(axis.text.x = element_text(angle = 90,size = 13))
+```
+
+__*23. $Ventas por marca, estado y mes$*__
+
+```{r, fig.width=18, fig.height=9}
+marca_estado<- tabla_final_2 %>% group_by(estado, marca, mes=floor_date(fecha, "month")) %>%
+   summarise(ventas=sum(ventas_diarias))
+ggplot(marca_estado, aes(x = mes, y = ventas, fill = marca)) + 
+  geom_bar(stat = "identity")+ 
+  scale_fill_brewer(palette = "Paired")+theme_classic()+facet_wrap(~estado)+labs(x="estado", y="ventas",title="Ventas por Estado por Marca")+theme(axis.text.x = element_text(angle = 90,size = 13))
+
+```
+
+
+
+
+
+
+
+
+
