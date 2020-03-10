@@ -1,0 +1,447 @@
+---
+title: "intento1_limpieza_con_sku"
+output: html_document
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+#Librerías 
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(visdat)
+library(naniar)
+library(tools)
+library(readr)
+library(xts)
+```
+
+```{r}
+a <- read_csv("project-objectstorage/VENTAS_CON_UBICACION_LIMPIO.csv")
+a <- a %>% select(-plan_tarifario)
+```
+
+
+###***2. Transformación de variables*** 
+
+**Paso 1:** Eliminar caracteres que pudieran haber prevalecido a lo largo de este proceso en la columna de plan tarifario, por ejemplo: comas. 
+
+```{r}
+ventas_con_ubicacion_limpio<- a
+#ventas_con_ubicacion_limpio$plan_tarifario<-gsub("[[:punct:]]", "", ventas_con_ubicacion_limpio$plan_tarifario)
+```
+
+____________________________________
+
+Paso 2: Calcular el costo promedio de los productos 
+
+```{r}
+costo_promedio <- ventas_con_ubicacion_limpio[,c(2,4)]%>%group_by(sku_por_equipo)%>%summarise(costo_promedio = mean(costo))
+costo_promedio <- costo_promedio %>%arrange(sku_por_equipo)
+costo_promedio
+```
+
+Paso 3: imputar costo promedio y quedarse con esa nueva variableen lugar de costo 
+
+```{r}
+ventas_con_ubicacion_limpio <- left_join(ventas_con_ubicacion_limpio, costo_promedio, by="sku_por_equipo")
+ventas_con_ubicacion_limpio <- ventas_con_ubicacion_limpio %>% select(-costo)
+ventas_con_ubicacion_limpio <- ventas_con_ubicacion_limpio %>% select(punto_de_venta, #plan_tarifario,
+                                                                      sku_por_equipo, fecha, costo_promedio, marca, ventas, mes, anio, marca_modificada, estado, ciudad, latitud, longitud, zona)
+```
+
+______________________________________
+
+
+**Paso 2:** Construir la variable gamma, dependiendo del costo de los productos y homogeneizar las familias de planes a 4 categorias. 
+
+```{r}
+ventas_con_ubicacion_limpio <- ventas_con_ubicacion_limpio%>%mutate(gamma_de_acuerdo_a_costo=0, familia_de_planes = "compartelo_adicional")
+head(ventas_con_ubicacion_limpio,10)
+```
+
+**Paso 3:** Asignar los valores correspondientes a las dos columnas nuevas. 
+
+```{r}
+#Registrar gamma
+ventas_con_ubicacion_limpio$gamma_de_acuerdo_a_costo[which(ventas_con_ubicacion_limpio$costo_promedio<=5000)]<-"baja"
+ventas_con_ubicacion_limpio$gamma_de_acuerdo_a_costo[which(ventas_con_ubicacion_limpio$costo_promedio>5000 & ventas_con_ubicacion_limpio$costo_promedio<=10000)]<-"media"
+ventas_con_ubicacion_limpio$gamma_de_acuerdo_a_costo[which(ventas_con_ubicacion_limpio$costo_promedio>10000 & ventas_con_ubicacion_limpio$costo_promedio<=15000)]<-"alta"
+ventas_con_ubicacion_limpio$gamma_de_acuerdo_a_costo[which(ventas_con_ubicacion_limpio$costo_promedio>15000)]<-"premium"
+```
+
+```{r}
+ventas_con_ubicacion_limpio%>%select(gamma_de_acuerdo_a_costo)%>%group_by(gamma_de_acuerdo_a_costo)%>%unique()
+#which(is.na(ventas_con_ubicacion_limpio$gamma_de_acuerdo_a_costo)) #Todos ya tienen registrado una gamma 
+```
+
+```{r}
+#hay 455 productos con una gamma particular 
+ventas_con_ubicacion_limpio[,c(2,15)]%>%unique()
+```
+
+```{r}
+#Registrar familias de planes: hay 55 diferentes, sin embargo, se van a homogeneizar a 4. 
+
+#Familia PLus 
+#ventas_con_ubicacion_limpio$familia_de_planes[which(ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 199" |
+                                                      ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 239"|
+                                                      ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 299"|
+                                                      ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 399"|
+                                                      ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 499"|
+                                                      ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 699"|
+                                                      ventas_con_ubicacion_limpio$plan_tarifario=="att plus atmv1 999")
+                                              ]<-"familia_plus"
+
+
+#Famillila compartelo negocios
+#ventas_con_ubicacion_limpio$familia_de_planes[which(ventas_con_ubicacion_limpio$plan_tarifario=="b compartelo incluido negocios" | ventas_con_ubicacion_limpio$plan_tarifario=="compartelo incluido negocios" | ventas_con_ubicacion_limpio$plan_tarifario=="b compartelo voz mensajes e internet negocios"| ventas_con_ubicacion_limpio$plan_tarifario=="compartelo voz mensajes e internet negocios")]<-"compartelo_negocios"
+
+
+#familia de compartelo incluido 
+#ventas_con_ubicacion_limpio$familia_de_planes[which(ventas_con_ubicacion_limpio$plan_tarifario=="compartelo incluido voz sms y datos" | ventas_con_ubicacion_limpio$plan_tarifario=="compartelo incluido voz sms datos")]<-"compartelo_incluido"
+```
+
+```{r}
+#ventas_con_ubicacion_limpio%>%select(familia_de_planes)%>%group_by(familia_de_planes)%>%unique()
+#which(is.na(ventas_con_ubicacion_limpio$familia_de_planes)) #Todos ya tienen registrado una gamma 
+```
+
+siguen siendo 1,047,575 observaciones
+
+**Paso 4:** Seleccionar columnas. 
+
+```{r}
+names(ventas_con_ubicacion_limpio)
+```
+
+************se quita familia de planes
+
+```{r}
+datos_ventas_ubicacion_gamma_familia <- ventas_con_ubicacion_limpio %>% select(punto_de_venta, 
+                                                                               fecha, 
+                                                                               mes, 
+                                                                               anio, 
+                                                                               ventas, 
+                                                                               sku_por_equipo, 
+                                                                               marca_modificada, 
+                                                                               gamma_de_acuerdo_a_costo, 
+                                                                               #familia_de_planes, 
+                                                                               zona, 
+                                                                               estado, 
+                                                                               ciudad, 
+                                                                               latitud, 
+                                                                               longitud)
+
+names(datos_ventas_ubicacion_gamma_familia) <- c("punto_de_venta", "fecha", "mes", "anio", "num_ventas", "sku", "marca","gamma", "zona", "estado", "ciudad", "latitud", "longitud")
+```
+
+```{r}
+names(datos_ventas_ubicacion_gamma_familia)
+```
+
+```{r, fig.width=20, fig.height=5}
+gg_miss_var(datos_ventas_ubicacion_gamma_familia) + labs(y = "Valores faltantes por variable.")
+```
+
+```{r}
+#write.csv(datos_ventas_ubicacion_gamma_familia, "DATOS_SEMI_COMPLETOS.csv", row.names = FALSE)
+```
+
+_______________________________________________________________________
+consideramos sku apartir de aqui 932,963 en lugar de 700 y algo
+_______________________________________________________________________
+```{r}
+#Calcular ventas por totales 932,963 en vez d 1048575
+DATOS_LIMPIOS <- datos_ventas_ubicacion_gamma_familia%>% 
+  group_by(punto_de_venta, fecha, mes, anio, sku, marca, gamma, zona, estado, ciudad, latitud, longitud)%>%summarise(ventas_diarias = sum(num_ventas)) #se añadio mes y a{io y sku en comparacion con el archivo anteior}
+
+DATOS_LIMPIOS
+```
+
+```{r}
+#write.csv(DATOS_LIMPIOS, "DATOS_LIMPIOS.csv", row.names = FALSE)
+```
+
+###***3. Ingeniería de Características***
+
+```{r}
+datos <- DATOS_LIMPIOS
+```
+
+**Paso 1:** Construir índices 
+
+```{r}
+#construccion de IDs 
+shopID <- datos[,1]%>%arrange(punto_de_venta)%>%unique() #1909 puntos de venta
+shopID$tiendaID <- as.character(seq.int(nrow(shopID)))
+
+marcaID <- datos[,6]%>%arrange(marca)%>%unique() #12 marcas
+marcaID$marcaID <- as.character(seq.int(nrow(marcaID)))
+
+gammaID <- datos[,7]%>%unique() #4 gammas
+gammaID$gammaID <- as.character(c(1,2,4,3))
+
+skuID <- datos[,5]%>%arrange(sku)%>%unique() #455 productos
+skuID$skuID <- as.character(seq.int(nrow(skuID)))
+
+fechaID <- datos[,3]%>%unique()
+fechaID$fechaID <- as.character(seq.int(0,9,1))
+```
+
+```{r}
+#ocnjunto de puntos de venta con su index
+datos <- ungroup(datos)
+shop_completar <- datos %>% select(punto_de_venta, zona, estado, ciudad, latitud, longitud)%>%unique() #1909 puntos de venta
+shop_completar$tiendaID <- as.character(seq.int(nrow(shopID)))
+```
+
+**Paso 2:** Juntas ID's con datos
+
+```{r}
+#juntas columnas con id en los datos 710,011 cambio a 932,963 cnsiderando sku y no plan tarifario
+datos <- left_join(datos, shopID, by="punto_de_venta")
+datos <- left_join(datos, marcaID, by="marca")
+datos <- left_join(datos, gammaID, by="gamma")
+datos <- left_join(datos, skuID, by="sku")
+datos <- left_join(datos, fechaID, by="mes")
+datos
+```
+
+```{r}
+datos <- datos %>% select(fechaID, fecha, tiendaID, punto_de_venta, marcaID, marca, gammaID, gamma, skuID, sku, ventas_diarias, mes, anio)
+```
+
+```{r}
+d <- datos[,c(5,7,9)]%>%select(skuID, marcaID,gammaID)%>%arrange(skuID)%>%unique()
+```
+
+
+**Paso 3:** Completar serie de tiempo 
+
+```{r}
+a <- merge(fechaID, shopID)
+b <- merge(a, d)
+dim(b)
+head(b)
+```
+
+```{r}
+completar_serie_de_tiempo <- b %>% select(tiendaID, marcaID, skuID, gammaID, fechaID)
+head(completar_serie_de_tiempo,10)
+```
+
+**Paso 4:** Crear  variable a predecir: ventas por mes (441,597)
+
+```{r}
+#calculamos ventas diarias por mes, tienda, marca, familia, gamma 
+medias <- datos %>% group_by(fechaID, tiendaID, marcaID, skuID, gammaID)%>%summarise(ventas_por_mes = sum(ventas_diarias))
+```
+
+```{r}
+completar_serie_de_tiempo <- left_join(completar_serie_de_tiempo, medias, by=c("fechaID", "tiendaID", "marcaID", "skuID", "gammaID"))
+```
+
+```{r}
+#which(is.na(completar_serie_de_tiempo$ventas_por_mes))
+```
+
+Los missings en ventas por mes corresponden a que no hubo ventas para esa marca, gamma, familia, en esa tienda y fecha; porlo tanto, sustituimos estos NA's con 0.
+
+```{r}
+completar_serie_de_tiempo[is.na(completar_serie_de_tiempo)] <- 0
+completar_serie_de_tiempo
+```
+
+```{r}
+sum(completar_serie_de_tiempo$ventas_por_mes)
+```
+
+
+
+
+
+
+
+
+AQUI_________TITULACION
+
+**Paso 5:** Crear nuevas características: Rezagos
+
+Creamos las características de ventas promedio por mes, tienda y producto  y ventas totales con las cuáles se crean las características que necesitamos de manera rezagada más adelante. 
+
+```{r}
+e<-datos%>%
+  group_by(fechaID, tiendaID)%>%
+  summarise(ventas_totales_por_tienda_por_mes=sum(ventas_diarias), 
+            ventas_promedio_por_tienda_por_mes = mean(ventas_diarias))
+```
+
+```{r}
+f<-datos%>%
+  group_by(fechaID, marcaID)%>%
+  summarise(ventas_totales_por_marca_por_mes=sum(ventas_diarias), 
+            ventas_promedio_por_marca_por_mes = mean(ventas_diarias))
+```
+
+```{r}
+g<-datos%>%
+  group_by(fechaID, gammaID)%>%
+  summarise(ventas_totales_por_gamma_por_mes=sum(ventas_diarias), 
+            ventas_promedio_por_gamma_por_mes = mean(ventas_diarias))
+```
+
+```{r}
+h<-datos%>%
+  group_by(fechaID, skuID)%>%
+  summarise(ventas_totales_por_sku_por_mes=sum(ventas_diarias), 
+            ventas_promedio_por_sku_por_mes = mean(ventas_diarias))
+```
+
+```{r}
+completar_serie_de_tiempo <- left_join(completar_serie_de_tiempo, e, by=c("tiendaID","fechaID"))
+completar_serie_de_tiempo <- left_join(completar_serie_de_tiempo, f, by=c("marcaID","fechaID"))
+completar_serie_de_tiempo <- left_join(completar_serie_de_tiempo, g, by=c("gammaID","fechaID"))
+completar_serie_de_tiempo <- left_join(completar_serie_de_tiempo, h, by=c("skuID","fechaID"))
+head(completar_serie_de_tiempo,10)
+```
+
+```{r}
+completar_serie_de_tiempo[is.na(completar_serie_de_tiempo)] <- 0
+```
+
+```{r}
+completar_serie_de_tiempo_1 <- left_join(completar_serie_de_tiempo, shop_completar, by="tiendaID")
+head(completar_serie_de_tiempo_1,10)
+```
+
+**DATOS SIN LAGS**
+
+```{r}
+#write.csv(completar_serie_de_tiempo_1,file="DATOS_SIN_LAGS_PARA_DB.csv",row.names = FALSE)
+```
+
+**Paso 6:** Crear rezagos 
+3:18 . 3:19
+```{r}
+x <- completar_serie_de_tiempo%>%
+  group_by(tiendaID, marcaID, skuID, gammaID)%>%
+  mutate(lag1mes_ventas_totales_por_tienda_por_mes=dplyr::lag(ventas_totales_por_tienda_por_mes, n=1),
+         lag1mes_ventas_promedio_por_tienda_por_mes=dplyr::lag(ventas_promedio_por_tienda_por_mes, n=1),
+         lag1mes_ventas_totales_por_marca_por_mes=dplyr::lag(ventas_totales_por_marca_por_mes, n=1),
+         lag1mes_entas_promedio_por_marca_por_mes=dplyr::lag(ventas_promedio_por_marca_por_mes, n=1),
+         lag1mes_ventas_totales_por_gamma_por_mes=dplyr::lag(ventas_totales_por_gamma_por_mes, n=1),
+         lag1mes_ventas_promedio_por_gamma_por_mes=dplyr::lag(ventas_promedio_por_gamma_por_mes, n=1),
+         lag1mes_ventas_totales_por_sku_por_mes=dplyr::lag(ventas_totales_por_sku_por_mes, n=1),
+         lag1mes_ventas_promedio_por_sku_por_mes=dplyr::lag(ventas_promedio_por_sku_por_mes, n=1),
+         
+         lag2mes_ventas_totales_por_tienda_por_mes=dplyr::lag(ventas_totales_por_tienda_por_mes, n=2),
+         lag2mes_ventas_promedio_por_tienda_por_mes=dplyr::lag(ventas_promedio_por_tienda_por_mes, n=2),
+         lag2mes_ventas_totales_por_marca_por_mes=dplyr::lag(ventas_totales_por_marca_por_mes, n=2),
+         lag2mes_entas_promedio_por_marca_por_mes=dplyr::lag(ventas_promedio_por_marca_por_mes, n=2),
+         lag2mes_ventas_totales_por_gamma_por_mes=dplyr::lag(ventas_totales_por_gamma_por_mes, n=2),
+         lag2mes_ventas_promedio_por_gamma_por_mes=dplyr::lag(ventas_promedio_por_gamma_por_mes, n=2),
+         lag2mes_ventas_totales_por_sku_por_mes=dplyr::lag(ventas_totales_por_sku_por_mes, n=2),
+         lag2mes_ventas_promedio_por_sku_por_mes=dplyr::lag(ventas_promedio_por_sku_por_mes, n=2), 
+         
+         lag3mes_ventas_totales_por_tienda_por_mes=dplyr::lag(ventas_totales_por_tienda_por_mes, n=3),
+         lag3mes_ventas_promedio_por_tienda_por_mes=dplyr::lag(ventas_promedio_por_tienda_por_mes, n=3),
+         lag3mes_ventas_totales_por_marca_por_mes=dplyr::lag(ventas_totales_por_marca_por_mes, n=3),
+         lag3mes_entas_promedio_por_marca_por_mes=dplyr::lag(ventas_promedio_por_marca_por_mes, n=3),
+         lag3mes_ventas_totales_por_gamma_por_mes=dplyr::lag(ventas_totales_por_gamma_por_mes, n=3),
+         lag3mes_ventas_promedio_por_gamma_por_mes=dplyr::lag(ventas_promedio_por_gamma_por_mes, n=3),
+         lag3mes_ventas_totales_por_sku_por_mes=dplyr::lag(ventas_totales_por_sku_por_mes, n=3),
+         lag3mes_ventas_promedio_por_sku_por_mes=dplyr::lag(ventas_promedio_por_sku_por_mes, n=3))
+```
+
+**Paso 7:** completar lag con valores iniciales (5:55-5:56)
+
+```{r, warning=FALSE}
+yy<-na.locf(x, fromLast = TRUE) 
+```
+
+```{r}
+#write.csv(yy,file="DATOS_CON_LAGS.csv",row.names = FALSE)
+```
+
+**Paso 8:** Formato para modelo 
+
+Quitar todos los datos que no se tendrán al momento de hacer la predicción. Conservar:  
+
+> * tiendaID
+* marcaID
+* familiaId
+* gammaID
+* fechaID
+* ventas_por_mes
+* resagos: 24
+
+```{r}
+#DATOS_LISTOS_MODELADO_REZAGOS <- yy%>%select(-ventas_totales_por_tienda_por_mes, -ventas_promedio_por_tienda_por_mes, -ventas_totales_por_marca_por_mes, -ventas_promedio_por_marca_por_mes, -ventas_totales_por_gamma_por_mes, -ventas_promedio_por_gamma_por_mes, -ventas_totales_por_sku_por_mes, -ventas_promedio_por_sku_por_mes)
+```
+
+**Paso 9:** Añadir las variables faltantes relacionadas con la ubicación de los puntos de venta para mapa 
+```{r}
+#DATOS_COMPLETOS_XGBOOST_MAPA <- left_join(DATOS_LISTOS_MODELADO_REZAGOS, shop_completar, by="tiendaID")
+```
+
+**Paso 10:** Guardar los archivos 
+
+crear variable y 
+
+```{r}
+shift<-function(x,shift_by){
+    stopifnot(is.numeric(shift_by))
+    stopifnot(is.numeric(x))
+
+    if (length(shift_by)>1)
+        return(sapply(shift_by,shift, x=x))
+
+    out<-NULL
+    abs_shift_by=abs(shift_by)
+    if (shift_by > 0 )
+        out<-c(tail(x,-abs_shift_by),rep(NA,abs_shift_by))
+    else if (shift_by < 0 )
+        out<-c(rep(NA,abs_shift_by), head(x,-abs_shift_by))
+    else
+        out<-x
+    out
+}
+```
+
+3:32
+```{r}
+datos_titulacion <- yy%>%
+  group_by(tiendaID, marcaID, skuID, gammaID)%>%
+  mutate(variable_y_ventas_del_siguiente_mes=shift(ventas_por_mes,1))
+
+#names(datos_titulacion)
+
+datos_titulacion <- datos_titulacion %>%select("tiendaID", 
+                                               "marcaID", "skuID", "gammaID", "fechaID", "ventas_por_mes","variable_y_ventas_del_siguiente_mes", "ventas_totales_por_tienda_por_mes","ventas_promedio_por_tienda_por_mes", "ventas_totales_por_marca_por_mes","ventas_promedio_por_marca_por_mes",         
+"ventas_totales_por_gamma_por_mes","ventas_promedio_por_gamma_por_mes",         
+"ventas_totales_por_sku_por_mes","ventas_promedio_por_sku_por_mes",
+"lag1mes_ventas_totales_por_tienda_por_mes","lag1mes_ventas_promedio_por_tienda_por_mes",
+"lag1mes_ventas_totales_por_marca_por_mes","lag1mes_entas_promedio_por_marca_por_mes",  
+"lag1mes_ventas_totales_por_gamma_por_mes","lag1mes_ventas_promedio_por_gamma_por_mes", 
+"lag1mes_ventas_totales_por_sku_por_mes","lag1mes_ventas_promedio_por_sku_por_mes",   
+"lag2mes_ventas_totales_por_tienda_por_mes","lag2mes_ventas_promedio_por_tienda_por_mes",
+"lag2mes_ventas_totales_por_marca_por_mes","lag2mes_entas_promedio_por_marca_por_mes",  
+"lag2mes_ventas_totales_por_gamma_por_mes","lag2mes_ventas_promedio_por_gamma_por_mes", 
+"lag2mes_ventas_totales_por_sku_por_mes","lag2mes_ventas_promedio_por_sku_por_mes",   
+"lag3mes_ventas_totales_por_tienda_por_mes","lag3mes_ventas_promedio_por_tienda_por_mes",
+"lag3mes_ventas_totales_por_marca_por_mes","lag3mes_entas_promedio_por_marca_por_mes",  
+"lag3mes_ventas_totales_por_gamma_por_mes","lag3mes_ventas_promedio_por_gamma_por_mes", 
+"lag3mes_ventas_totales_por_sku_por_mes","lag3mes_ventas_promedio_por_sku_por_mes")
+
+```
+
+
+```{r}
+write.csv(datos_titulacion,file="DATOS_COMPLETOS_FINALES_TITULACION_PARA_MODELOS.csv", row.names=FALSE)
+```
+
+```{r}
+#write.csv(DATOS_COMPLETOS_XGBOOST_MAPA,file="DATOS_COMPLETOS_ENTRENAMIENTO_XGBOOST_MAPA.csv", row.names=FALSE)
+```
+
+> **PARA EL MODELO TENEMOS TENEMOS 30 VARIABLES, 3 REZAGOS, 8 CONTEOS DISTINTOS.**
